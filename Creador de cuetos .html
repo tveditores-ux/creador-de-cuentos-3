@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>GracePrint Story Studio Gold</title>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root { --primary: #4a6cf7; --epub: #27ae60; --accent: #ff6b6b; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .panel { background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #334155; }
+        textarea { width: 100%; height: 150px; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: 'Patrick Hand', cursive; font-size: 18px; box-sizing: border-box; }
+        .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; font-size: 16px; }
+        .btn-gen { background: var(--primary); }
+        .btn-pdf { background: var(--accent); }
+        .btn-epub { background: var(--epub); }
+        #preview { margin-top: 30px; text-align: center; }
+        #preview img { max-width: 100%; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align:center; color: #1e293b;">🎨 GracePrint Story Studio HD</h1>
+    
+    <div class="grid">
+        <div class="panel">
+            <label>1. Imágenes (Izquierda)</label>
+            <input type="file" id="images" multiple accept="image/*">
+            <label style="margin-top:15px">2. Fondo de Hoja (Derecha)</label>
+            <input type="file" id="template" accept="image/*">
+        </div>
+        <div class="panel">
+            <label>3. Texto del Cuento (Párrafo por página)</label>
+            <textarea id="storyText" placeholder="Había una vez..."></textarea>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn-gen" onclick="generar()">✨ 1. Generar</button>
+        <button class="btn-pdf" onclick="exportarPDF()">📥 2. Guardar PDF</button>
+        <button class="btn-epub" onclick="exportarEPUB()">📖 3. Guardar ePUB</button>
+    </div>
+
+    <div id="preview"></div>
+</div>
+
+<script>
+let paginasData = []; // Guardará las imágenes en base64
+
+async function generar() {
+    const imgFiles = document.getElementById('images').files;
+    const tplFile = document.getElementById('template').files[0];
+    const parrafos = document.getElementById('storyText').value.split('\n').filter(p => p.trim() !== "");
+    const preview = document.getElementById('preview');
+
+    if (!imgFiles.length || !tplFile) return alert("Faltan archivos.");
+
+    paginasData = [];
+    preview.innerHTML = "<h3>Procesando...</h3>";
+    const tplImg = await loadImg(tplFile);
+
+    for (let i = 0; i < imgFiles.length; i++) {
+        const leftImg = await loadImg(imgFiles[i]);
+        const textoCompleto = parrafos[i] || "";
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const h = 1600; // Resolución optimizada para ePUB y PDF
+        const lw = (leftImg.width * h) / leftImg.height;
+        const rw = (tplImg.width * h) / tplImg.height;
+        canvas.width = lw + rw; canvas.height = h;
+
+        ctx.drawImage(leftImg, 0, 0, lw, h);
+        ctx.drawImage(tplImg, lw, 0, rw, h);
+
+        if (textoCompleto.length > 0) {
+            const marginX = lw + (rw * 0.12);
+            const marginY = h * 0.20;
+            const contentWidth = rw * 0.76;
+
+            ctx.fillStyle = "#1e3a8a"; 
+            ctx.font = "bold 200px 'Patrick Hand', cursive";
+            const capitel = textoCompleto.charAt(0).toUpperCase();
+            const restoTexto = textoCompleto.slice(1);
+            const capitelWidth = ctx.measureText(capitel).width + 45;
+            
+            ctx.fillText(capitel, marginX, marginY + 130);
+            ctx.fillStyle = "#334155";
+            ctx.font = "65px 'Patrick Hand', cursive";
+            
+            wrapTextSmart(ctx, restoTexto, marginX, marginY + 55, contentWidth, 80, capitelWidth, 2);
+        }
+
+        // Logo GracePrint
+        ctx.font = "bold 35px Arial";
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.textAlign = "center";
+        ctx.fillText("GracePrint", lw + (rw/2), h - 80);
+        ctx.textAlign = "left";
+
+        const url = canvas.toDataURL('image/jpeg', 0.85);
+        paginasData.push({url, w: canvas.width, h: canvas.height});
+        
+        const previewImg = document.createElement('img');
+        previewImg.src = url;
+        preview.appendChild(previewImg);
+    }
+    preview.querySelector('h3').innerText = "Vista Previa:";
+}
+
+function wrapTextSmart(ctx, text, x, y, maxWidth, lineHeight, gapWidth, linesWithGap) {
+    const words = text.split(' ');
+    let line = ''; let currentLineNum = 1; let currentY = y;
+    for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let currentX = (currentLineNum <= linesWithGap) ? (x + gapWidth) : x;
+        let currentMaxW = (currentLineNum <= linesWithGap) ? (maxWidth - gapWidth) : maxWidth;
+        if (ctx.measureText(testLine).width > currentMaxW && n > 0) {
+            ctx.fillText(line, currentX, currentY);
+            line = words[n] + ' '; currentY += lineHeight; currentLineNum++;
+        } else { line = testLine; }
+    }
+    ctx.fillText(line, (currentLineNum <= linesWithGap ? x + gapWidth : x), currentY);
+}
+
+function loadImg(file) {
+    return new Promise(res => {
+        const i = new Image();
+        i.onload = () => res(i);
+        i.src = URL.createObjectURL(file);
+    });
+}
+
+function exportarPDF() {
+    if (!paginasData.length) return alert("Genera el cuento primero.");
+    const pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'px', format: [paginasData[0].w, paginasData[0].h] });
+    paginasData.forEach((p, i) => {
+        if (i > 0) pdf.addPage([p.w, p.h], 'landscape');
+        pdf.addImage(p.url, 'JPEG', 0, 0, p.w, p.h);
+    });
+    pdf.save("Cuento_GracePrint.pdf");
+}
+
+async function exportarEPUB() {
+    if (!paginasData.length) return alert("Genera el cuento primero.");
+    const zip = new JSZip();
+    
+    // 1. Estructura obligatoria
+    zip.file("mimetype", "application/epub+zip");
+    const meta = zip.folder("META-INF");
+    meta.file("container.xml", `<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`);
+
+    // 2. Carpeta de contenido
+    const oebps = zip.folder("OEBPS");
+    const imagesFolder = oebps.folder("images");
+
+    let manifest = "";
+    let spine = "";
+
+    paginasData.forEach((p, i) => {
+        const imgData = p.url.split(',')[1];
+        const fileName = `page${i}.jpg`;
+        imagesFolder.file(fileName, imgData, {base64: true});
+
+        const htmlContent = `<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Page ${i}</title><style>body{margin:0;padding:0;text-align:center;background:#fff;} img{width:100%;height:auto;}</style></head><body><img src="images/${fileName}"/></body></html>`;
+        oebps.file(`page${i}.xhtml`, htmlContent);
+
+        manifest += `<item id="p${i}" href="page${i}.xhtml" media-type="application/xhtml+xml"/>\n<item id="img${i}" href="images/${fileName}" media-type="image/jpeg"/>\n`;
+        spine += `<itemref idref="p${i}"/>\n`;
+    });
+
+    const opf = `<?xml version="1.0" encoding="UTF-8"?>
+    <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="pub-id" version="3.0">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:title>Cuento GracePrint</dc:title>
+            <dc:language>es</dc:language>
+            <dc:identifier id="pub-id">graceprint-${Date.now()}</dc:identifier>
+        </metadata>
+        <manifest>
+            ${manifest}
+            <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+        </manifest>
+        <spine toc="ncx">${spine}</spine>
+    </package>`;
+
+    oebps.file("content.opf", opf);
+    oebps.file("toc.ncx", `<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap><navPoint id="np1"><navLabel><text>Cuento</text></navLabel><content src="page0.xhtml"/></navPoint></navMap></ncx>`);
+
+    const content = await zip.generateAsync({type:"blob"});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(content);
+    link.download = "Cuento_GracePrint.epub";
+    link.click();
+}
+</script>
+</body>
+</html>
