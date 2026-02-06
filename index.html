@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>GracePrint Story Studio - Fix Edition</title>
+    <title>GracePrint Studio - Fixed Layout Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -14,35 +14,40 @@
         .panel { background: #f8fafc; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; }
         textarea { width: 100%; height: 120px; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: 'Patrick Hand', cursive; font-size: 18px; box-sizing: border-box; }
         .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; }
-        button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; }
+        button { padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-gen { background: var(--primary); }
         .btn-pdf { background: var(--accent); }
         .btn-epub { background: var(--epub); }
-        #preview { margin-top: 30px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-        #preview img { height: 200px; border: 2px solid #ddd; border-radius: 4px; }
+        #preview { margin-top: 30px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; background: #cbd5e1; padding: 20px; border-radius: 10px; }
+        #preview img { height: 180px; border: 3px solid white; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align:center;">📖 GracePrint Fixer</h1>
+    <h1 style="text-align:center; color: #1e293b;">📖 GracePrint Story Studio</h1>
+    <p style="text-align:center; color: #64748b;">La 1ª imagen es <b>Portada</b>, la última es <b>Contraportada</b>.</p>
+    
     <div class="grid">
         <div class="panel">
-            <label><b>1. Imágenes</b> (Portada, Interiores, Contra)</label>
-            <input type="file" id="images" multiple accept="image/*" style="width:100%">
-            <label style="display:block; margin-top:15px"><b>2. Fondo de Hoja</b></label>
-            <input type="file" id="template" accept="image/*" style="width:100%">
+            <label><b>1. Imágenes del Cuento</b></label>
+            <input type="file" id="images" multiple accept="image/*" style="width:100%; margin-top:10px;">
+            <label style="display:block; margin-top:15px"><b>2. Papel Tapiz (Interiores)</b></label>
+            <input type="file" id="template" accept="image/*" style="width:100%; margin-top:10px;">
         </div>
         <div class="panel">
-            <label><b>3. Textos</b> (Uno por página interior)</label>
-            <textarea id="storyText" placeholder="Párrafo 1...&#10;Párrafo 2..."></textarea>
+            <label><b>3. Textos</b> (Un párrafo por hoja interior)</label>
+            <textarea id="storyText" placeholder="Escribe aquí los párrafos..."></textarea>
         </div>
     </div>
+
     <div class="actions">
-        <button class="btn-gen" onclick="generar()">✨ Procesar</button>
-        <button class="btn-pdf" onclick="exportarPDF()">📄 PDF</button>
-        <button class="btn-epub" onclick="exportarEPUB()">📖 ePUB</button>
+        <button class="btn-gen" onclick="generar()">✨ 1. Procesar Libro</button>
+        <button class="btn-pdf" onclick="exportarPDF()">📄 2. Guardar PDF</button>
+        <button class="btn-epub" onclick="exportarEPUB()">📖 3. Guardar ePUB</button>
     </div>
+
     <div id="preview"></div>
 </div>
 
@@ -55,7 +60,7 @@ async function generar() {
     const parrafos = document.getElementById('storyText').value.split('\n').filter(p => p.trim() !== "");
     const preview = document.getElementById('preview');
 
-    if (imgFiles.length < 2) return alert("Sube al menos portada y contraportada.");
+    if (imgFiles.length < 2) return alert("Sube al menos 2 imágenes.");
     
     paginasData = [];
     preview.innerHTML = "";
@@ -65,20 +70,23 @@ async function generar() {
         const currentImg = await loadImg(imgFiles[i]);
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const h = 1200; 
+        const h = 1200; // Altura base
 
         const esPortada = (i === 0);
         const esContra = (i === imgFiles.length - 1);
 
         if (esPortada || esContra) {
+            // HOJA VIUDA (Solo imagen)
             canvas.width = (currentImg.width * h) / currentImg.height;
             canvas.height = h;
             ctx.drawImage(currentImg, 0, 0, canvas.width, h);
         } else {
+            // HOJA DOBLE (Imagen + Texto)
             const lw = (currentImg.width * h) / currentImg.height;
-            const rw = tplImg ? (tplImg.width * h) / tplImg.height : lw;
+            const rw = tplImg ? (tplImg.width * h) / tplImg.height : 800;
             canvas.width = lw + rw;
             canvas.height = h;
+            
             ctx.drawImage(currentImg, 0, 0, lw, h);
             if (tplImg) ctx.drawImage(tplImg, lw, 0, rw, h);
 
@@ -90,29 +98,35 @@ async function generar() {
                 const cap = texto.charAt(0).toUpperCase();
                 const capW = ctx.measureText(cap).width + 30;
                 ctx.fillText(cap, mx, 300);
+                
                 ctx.fillStyle = "#334155";
                 ctx.font = "50px 'Patrick Hand', cursive";
                 wrapText(ctx, texto.slice(1), mx, 240, rw * 0.76, 60, capW, 2);
             }
         }
-        paginasData.push({ url: canvas.toDataURL('image/jpeg', 0.8), w: canvas.width, h: canvas.height });
-        const pImg = document.createElement('img'); pImg.src = paginasData[i].url; preview.appendChild(pImg);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        paginasData.push({ url: dataUrl, w: canvas.width, h: canvas.height });
+        
+        const pImg = document.createElement('img');
+        pImg.src = dataUrl;
+        preview.appendChild(pImg);
     }
 }
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, gapWidth, linesWithGap) {
     const words = text.split(' ');
-    let line = ''; let curLine = 1; let curY = y;
+    let line = ''; let curL = 1; let curY = y;
     for (let n = 0; n < words.length; n++) {
         let test = line + words[n] + ' ';
-        let cx = (curLine <= linesWithGap) ? (x + gapWidth) : x;
-        let cw = (curLine <= linesWithGap) ? (maxWidth - gapWidth) : maxWidth;
+        let cx = (curL <= linesWithGap) ? (x + gapWidth) : x;
+        let cw = (curL <= linesWithGap) ? (maxWidth - gapWidth) : maxWidth;
         if (ctx.measureText(test).width > cw && n > 0) {
             ctx.fillText(line, cx, curY);
-            line = words[n] + ' '; curY += lineHeight; curLine++;
+            line = words[n] + ' '; curY += lineHeight; curL++;
         } else { line = test; }
     }
-    ctx.fillText(line, (curLine <= linesWithGap ? x + gapWidth : x), curY);
+    ctx.fillText(line, (curL <= linesWithGap ? x + gapWidth : x), curY);
 }
 
 function loadImg(f) { return new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = URL.createObjectURL(f); }); }
@@ -124,52 +138,83 @@ function exportarPDF() {
         else { pdf.deletePage(1); pdf.addPage([p.w, p.h], p.w > p.h ? 'l' : 'p'); }
         pdf.addImage(p.url, 'JPEG', 0, 0, p.w, p.h);
     });
-    pdf.save("cuento.pdf");
+    pdf.save("cuento-graceprint.pdf");
 }
 
 async function exportarEPUB() {
-    const zip = new JSZip();
-    // EL SECRETO: El archivo mimetype debe ser el primero y SIN compresión
-    zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+    if (paginasData.length === 0) return alert("Primero genera el libro.");
     
+    const zip = new JSZip();
+    // REGLA DE ORO: El mimetype debe ser el primer archivo y SIN COMPRESIÓN
+    zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+
     const meta = zip.folder("META-INF");
-    meta.file("container.xml", `<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`);
+    meta.file("container.xml", `<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`);
 
     const oebps = zip.folder("OEBPS");
-    let manifest = ""; let spine = "";
+    let manifest = "";
+    let spine = "";
 
     for (let i = 0; i < paginasData.length; i++) {
         const p = paginasData[i];
-        oebps.folder("images").file(`p${i}.jpg`, p.url.split(',')[1], {base64: true});
+        const imgName = `p${i}.jpg`;
+        const htmlName = `p${i}.xhtml`;
         
-        oebps.file(`p${i}.xhtml`, `<?xml version="1.0" encoding="UTF-8"?>
-        <html xmlns="http://www.w3.org/1999/xhtml"><head><title>P${i}</title>
-        <meta name="viewport" content="width=${p.w}, height=${p.h}"/>
-        <style>body{margin:0;padding:0;background:#000;} img{width:100%;height:100%;}</style></head>
-        <body><img src="images/p${i}.jpg"/></body></html>`);
+        // Guardar imagen
+        oebps.folder("images").file(imgName, p.url.split(',')[1], {base64: true});
 
-        manifest += `<item id="xhtml${i}" href="p${i}.xhtml" media-type="application/xhtml+xml"/>\n`;
-        manifest += `<item id="img${i}" href="images/p${i}.jpg" media-type="image/jpeg" ${i===0?'properties="cover-image"':''}/>\n`;
+        // Crear página XHTML
+        oebps.file(htmlName, `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+    <title>Pagina ${i}</title>
+    <meta name="viewport" content="width=${p.w}, height=${p.h}"/>
+    <style>
+        body { margin:0; padding:0; background-color:#000; }
+        img { width: ${p.w}px; height: ${p.h}px; }
+    </style>
+</head>
+<body>
+    <img src="images/${imgName}" alt="p${i}"/>
+</body>
+</html>`);
+
+        manifest += `<item id="page${i}" href="${htmlName}" media-type="application/xhtml+xml"/>\n`;
+        manifest += `<item id="img${i}" href="images/${imgName}" media-type="image/jpeg" ${i===0?'properties="cover-image"':''}/>\n`;
         
-        let pos = (i === 0) ? 'center' : (i === paginasData.length - 1 ? 'center' : (i % 2 === 0 ? 'right' : 'left'));
-        spine += `<itemref idref="xhtml${i}" properties="page-spread-${pos}"/>\n`;
+        // Efecto libro: Portada y Contraportada al centro, el resto repartido
+        let spread = (i === 0 || i === paginasData.length - 1) ? 'center' : (i % 2 === 0 ? 'right' : 'left');
+        spine += `<itemref idref="page${i}" properties="page-spread-${spread}"/>\n`;
     }
 
     oebps.file("content.opf", `<?xml version="1.0" encoding="UTF-8"?>
-    <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
-        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-            <dc:title>Mi Libro GracePrint</dc:title>
-            <dc:language>es</dc:language>
-            <dc:identifier id="pub-id">GP-${Date.now()}</dc:identifier>
-            <meta property="rendition:layout">pre-paginated</meta>
-            <meta property="rendition:spread">auto</meta>
-        </metadata>
-        <manifest>${manifest}</manifest>
-        <spine>${spine}</spine>
-    </package>`);
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title>Cuento GracePrint</dc:title>
+        <dc:language>es</dc:language>
+        <dc:identifier id="pub-id">GP-${Date.now()}</dc:identifier>
+        <meta property="rendition:layout">pre-paginated</meta>
+        <meta property="rendition:spread">auto</meta>
+        <meta property="rendition:orientation">auto</meta>
+    </metadata>
+    <manifest>
+        ${manifest}
+    </manifest>
+    <spine>
+        ${spine}
+    </spine>
+</package>`);
 
-    const content = await zip.generateAsync({type:"blob", mimeType: "application/epub+zip"});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = "Libro_GracePrint.epub"; a.click();
+    const blob = await zip.generateAsync({
+        type: "blob",
+        mimeType: "application/epub+zip",
+        compression: "DEFLATE"
+    });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = "Libro_GracePrint_Final.epub";
+    link.click();
 }
 </script>
 </body>
